@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cloud ROIC</title>
+<meta name="description" content="Return on invested capital across hyperscalers, neoclouds, data-centre landlords and AI silicon, computed daily from SEC filings.">
+<style>
+:root {
+  color-scheme: light;
+  --surface: #fcfcfb; --surface-2: #f1f1ee; --line: #e2e2dd; --grid: #ececE8;
+  --text: #0b0b0b; --text-2: #52514e; --text-3: #8a8985;
+  --l1: #2a78d6; --l2: #eb6834; --l3: #1baf7a; --l4: #eda100;
+  --neg: #e34948; --tooltip-bg: #ffffff;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --surface: #1a1a19; --surface-2: #232322; --line: #34342f; --grid: #2a2a27;
+    --text: #ffffff; --text-2: #c3c2b7; --text-3: #8f8e86;
+    --l1: #3987e5; --l2: #d95926; --l3: #199e70; --l4: #c98500;
+    --neg: #e66767; --tooltip-bg: #262624;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--surface); color: var(--text); font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif; padding: 0 20px 60px; }
+main { max-width: 1120px; margin: 0 auto; }
+header { padding: 40px 0 8px; }
+h1 { font-size: 30px; margin: 0 0 4px; letter-spacing: -0.02em; }
+h2 { font-size: 18px; margin: 42px 0 4px; }
+.sub { color: var(--text-2); margin: 0; }
+.meta { color: var(--text-3); font-size: 13px; margin-top: 8px; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; margin-top: 22px; }
+.tile { background: var(--surface-2); border-radius: 12px; padding: 16px 18px 14px; border-top: 3px solid var(--c); }
+.tile .name { font-size: 13px; color: var(--text-2); display: flex; justify-content: space-between; }
+.tile .hero { font-size: 40px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.1; margin: 6px 0 4px; font-variant-numeric: tabular-nums; }
+.tile .row { font-size: 13px; color: var(--text-2); display: flex; gap: 14px; flex-wrap: wrap; }
+.tile .row b { color: var(--text); font-weight: 500; font-variant-numeric: tabular-nums; }
+.legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 13px; color: var(--text-2); margin: 6px 0 10px; }
+.legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 2px; background: var(--c); margin-right: 6px; vertical-align: -1px; }
+.chart { position: relative; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(440px, 1fr)); gap: 28px; }
+@media (max-width: 520px) { .grid2 { grid-template-columns: 1fr; } }
+.filters { display: flex; gap: 6px; margin: 4px 0 8px; font-size: 13px; }
+.filters button { border: 1px solid var(--line); background: var(--surface-2); color: var(--text-2); border-radius: 999px; padding: 4px 12px; cursor: pointer; font: inherit; }
+.filters button[aria-pressed="true"] { background: var(--text); color: var(--surface); border-color: var(--text); }
+.tip { position: absolute; pointer-events: none; background: var(--tooltip-bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 12.5px; line-height: 1.4; box-shadow: 0 6px 24px rgba(0,0,0,.14); display: none; z-index: 5; min-width: 150px; }
+.tip b { font-weight: 600; }
+.tip .r { display: flex; justify-content: space-between; gap: 14px; font-variant-numeric: tabular-nums; }
+.tip .sw { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 6px; vertical-align: 0; }
+svg text { font: 12px -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif; fill: var(--text-2); font-variant-numeric: tabular-nums; }
+svg text.v { fill: var(--text); }
+svg .axis { stroke: var(--line); }
+svg .gridl { stroke: var(--grid); }
+.tablewrap { overflow-x: auto; margin-top: 10px; }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+th, td { text-align: right; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+th { color: var(--text-2); font-weight: 500; position: sticky; top: 0; background: var(--surface); }
+td:first-child, th:first-child { text-align: left; }
+td .sw { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 8px; }
+td a { color: inherit; }
+.na { color: var(--text-3); }
+.neg { color: var(--neg); }
+.method { font-size: 13.5px; color: var(--text-2); max-width: 820px; }
+.method p { margin: 8px 0; }
+.problems { font-size: 13px; color: var(--text-3); }
+code { font-size: 12.5px; background: var(--surface-2); padding: 1px 5px; border-radius: 4px; }
+</style>
+</head>
+<body>
+<main>
+<header>
+  <h1>Cloud ROIC</h1>
+  <p class="sub">Return on invested capital across the AI stack, from the SEC filings of every listed hyperscaler, neocloud, data-centre landlord and AI-silicon vendor. Trailing twelve months, rebuilt every morning from EDGAR.</p>
+  <p class="meta" id="meta"></p>
+</header>
+<section class="kpis" id="kpis"></section>
+
+<h2>ROIC by company</h2>
+<p class="sub">Trailing-twelve-month NOPAT over average invested capital. Companies whose invested capital is negative show no ratio.</p>
+<div class="legend" id="legend1"></div>
+<div class="chart" id="roicbars"></div>
+
+<div class="grid2">
+  <div>
+    <h2>Capex intensity</h2>
+    <p class="sub">Trailing-twelve-month capital expenditure as a share of revenue.</p>
+    <div class="chart" id="capexbars"></div>
+  </div>
+  <div>
+    <h2>Growth vs returns</h2>
+    <p class="sub">Revenue growth year on year against ROIC, one dot per company.</p>
+    <div class="chart" id="scatter"></div>
+  </div>
+</div>
+
+<h2>ROIC over time</h2>
+<p class="sub">Hyperscalers and AI silicon, trailing twelve months at each quarter end.</p>
+<div class="filters" id="range"></div>
+<div class="legend" id="legend2"></div>
+<div class="chart" id="roiclines"></div>
+
+<div class="grid2">
+  <div>
+    <h2>Hyperscaler capex, trailing twelve months</h2>
+    <p class="sub">Stacked, $ billions.</p>
+    <div class="chart" id="capexstack"></div>
+    <div class="legend" id="legend3"></div>
+  </div>
+  <div>
+    <h2>Neocloud capex, trailing twelve months</h2>
+    <p class="sub">Stacked, $ billions.</p>
+    <div class="chart" id="neostack"></div>
+    <div class="legend" id="legend4"></div>
+  </div>
+</div>
+
+<h2>Every company</h2>
+<p class="sub">Each row links to the filing the numbers come from.</p>
+<div class="tablewrap"><table id="table"></table></div>
+
+<h2>Method</h2>
+<div class="method" id="method"></div>
+<p class="problems" id="problems"></p>
+</main>
+<div class="tip" id="tip"></div>
+<script>
+const D = __DATA__;
+const LAYER_COLOR = { "Hyperscalers": "var(--l1)", "Neoclouds": "var(--l2)", "Data-centre landlords": "var(--l3)", "AI silicon": "var(--l4)" };
+const fmtB = v => v == null ? "n/a" : (Math.abs(v) >= 1e12 ? "$" + (v / 1e12).toFixed(2) + "T" : "$" + (v / 1e9).toFixed(Math.abs(v) < 1e10 ? 1 : 0) + "B");
+const fmtP = (v, d = 1) => v == null ? "n/a" : (v * 100).toFixed(d) + "%";
+const fmtX = v => v == null ? "n/a" : v.toFixed(1) + "×";
+const CO = D.companies.filter(c => c.latest);
+const tip = document.getElementById("tip");
+function showTip(html, x, y) { tip.innerHTML = html; tip.style.display = "block"; const r = tip.getBoundingClientRect(); const px = Math.min(x + 14, window.innerWidth - r.width - 12); tip.style.left = (px + window.scrollX) + "px"; tip.style.top = (y - r.height - 12 + window.scrollY) + "px"; }
+function hideTip() { tip.style.display = "none"; }
+const svgEl = (tag, attrs = {}, text) => { const e = document.createElementNS("http://www.w3.org/2000/svg", tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (text != null) e.textContent = text; return e; };
+const niceTicks = (min, max, n = 5) => { const span = max - min || 1; const raw = span / n; const p = Math.pow(10, Math.floor(Math.log10(raw))); const step = [1, 2, 2.5, 5, 10].map(m => m * p).find(s => span / s <= n) || p * 10; const out = []; for (let v = Math.ceil(min / step) * step; v <= max + 1e-9; v += step) out.push(+v.toFixed(10)); return out; };
+
+// header + KPIs
+document.getElementById("meta").textContent = "Generated " + new Date(D.generated).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) + " · latest quarter in the data " + CO.map(c => c.asof).sort().slice(-1)[0] + " · " + CO.length + " companies";
+document.getElementById("kpis").innerHTML = D.layers.map(l => `<div class="tile" style="--c:${LAYER_COLOR[l.layer]}"><div class="name"><span>${l.layer}</span><span>${l.companies.length} cos</span></div><div class="hero">${fmtP(l.roic)}</div><div class="row"><span>revenue <b>${fmtB(l.revenue_ttm)}</b></span><span>capex <b>${fmtB(l.capex_ttm)}</b></span><span>invested <b>${fmtB(l.invested)}</b></span></div></div>`).join("");
+const legend = id => document.getElementById(id).innerHTML = D.layers.map(l => `<span style="--c:${LAYER_COLOR[l.layer]}">${l.layer}</span>`).join("");
+legend("legend1");
+
+// horizontal bar chart: value per company, baseline at zero, rounded data end, direct labels, hover tooltip
+function hbar(id, rows, { fmt, tipRows, W = 1100, left: left0 = 150 }) {
+  let left = left0;
+  const el = document.getElementById(id); el.innerHTML = "";
+  const rowH = 26, right = 70, top = 8;
+  const H = top + rows.length * rowH + 30;
+  const vals = rows.map(r => r.v).filter(v => v != null);
+  const min = Math.min(0, ...vals) * 1.2, max = Math.max(0, ...vals);
+  if (min < 0) left += 40;   // room for value labels at the end of negative bars
+  const x = v => left + (v - min) / (max - min || 1) * (W - left - right);
+  const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": id });
+  for (const t of niceTicks(min, max, 6)) { svg.append(svgEl("line", { x1: x(t), x2: x(t), y1: top, y2: H - 26, class: "gridl" })); svg.append(svgEl("text", { x: x(t), y: H - 8, "text-anchor": "middle" }, fmt(t))); }
+  svg.append(svgEl("line", { x1: x(0), x2: x(0), y1: top, y2: H - 26, class: "axis" }));
+  rows.forEach((r, i) => {
+    const y = top + i * rowH + 5, h = rowH - 10;
+    svg.append(svgEl("text", { x: left - 10, y: y + h / 2 + 4, "text-anchor": "end", class: "v" }, r.label));
+    if (r.v == null) { svg.append(svgEl("text", { x: x(0) + 8, y: y + h / 2 + 4 }, r.note || "n/a")); return; }
+    const x0 = x(0), x1 = x(r.v), w = Math.abs(x1 - x0), rr = Math.min(4, w);
+    const d = r.v >= 0 ? `M${x0},${y}h${w - rr}a${rr},${rr} 0 0 1 ${rr},${rr}v${h - 2 * rr}a${rr},${rr} 0 0 1 -${rr},${rr}h-${w - rr}z`
+                       : `M${x0},${y}h-${w - rr}a${rr},${rr} 0 0 0 -${rr},${rr}v${h - 2 * rr}a${rr},${rr} 0 0 0 ${rr},${rr}h${w - rr}z`;
+    const p = svgEl("path", { d, fill: r.color });
+    p.addEventListener("mousemove", e => showTip(tipRows(r), e.clientX, e.clientY)); p.addEventListener("mouseleave", hideTip);
+    svg.append(p);
+    svg.append(svgEl("text", { x: r.v >= 0 ? x1 + 6 : x1 - 6, y: y + h / 2 + 4, "text-anchor": r.v >= 0 ? "start" : "end", class: "v" }, fmt(r.v)));
+  });
+  el.append(svg);
+}
+const tipCo = c => `<b>${c.name}</b> <span style="color:var(--text-3)">${c.ticker} · ${c.layer}</span><div class="r"><span>ROIC</span><span>${fmtP(c.latest.roic)}</span></div><div class="r"><span>Revenue TTM</span><span>${fmtB(c.latest.revenue_ttm)}</span></div><div class="r"><span>Capex TTM</span><span>${fmtB(c.latest.capex_ttm)}</span></div><div class="r"><span>Invested capital</span><span>${fmtB(c.latest.invested)}</span></div><div class="r"><span>As of</span><span>${c.asof}</span></div>`;
+const byRoic = [...CO].sort((a, b) => (b.latest.roic ?? -9) - (a.latest.roic ?? -9));
+hbar("roicbars", byRoic.map(c => ({ label: c.name, v: c.latest.roic, color: LAYER_COLOR[c.layer], c, note: c.latest.invested != null && c.latest.invested <= 0 ? "negative invested capital" : "n/a" })), { fmt: v => fmtP(v, 0), tipRows: r => tipCo(r.c) });
+const byCapex = CO.filter(c => c.latest.capex_intensity != null).sort((a, b) => b.latest.capex_intensity - a.latest.capex_intensity);
+hbar("capexbars", byCapex.map(c => ({ label: c.name, v: c.latest.capex_intensity, color: LAYER_COLOR[c.layer], c })), { fmt: v => fmtP(v, 0), tipRows: r => tipCo(r.c), W: 540, left: 120 });
+
+// scatter: growth vs ROIC
+(function scatter() {
+  const el = document.getElementById("scatter"); const pts = CO.filter(c => c.revenue_growth != null && c.latest.roic != null);
+  const W = 540, H = byCapex.length * 26 + 38, left = 52, right = 16, top = 12, bottom = 34;
+  const gx = pts.map(p => Math.min(p.revenue_growth, 2)), gy = pts.map(p => p.latest.roic);
+  const xmin = Math.min(0, ...gx), xmax = Math.max(...gx) * 1.05, ymin = Math.min(0, ...gy), ymax = Math.max(...gy) * 1.05;
+  const x = v => left + (Math.min(v, 2) - xmin) / (xmax - xmin) * (W - left - right), y = v => H - bottom - (v - ymin) / (ymax - ymin) * (H - top - bottom);
+  const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "growth versus ROIC" });
+  for (const t of niceTicks(xmin, xmax, 5)) { svg.append(svgEl("line", { x1: x(t), x2: x(t), y1: top, y2: H - bottom, class: "gridl" })); svg.append(svgEl("text", { x: x(t), y: H - 12, "text-anchor": "middle" }, fmtP(t, 0))); }
+  for (const t of niceTicks(ymin, ymax, 5)) { svg.append(svgEl("line", { x1: left, x2: W - right, y1: y(t), y2: y(t), class: "gridl" })); svg.append(svgEl("text", { x: left - 8, y: y(t) + 4, "text-anchor": "end" }, fmtP(t, 0))); }
+  svg.append(svgEl("line", { x1: left, x2: W - right, y1: y(0), y2: y(0), class: "axis" })); svg.append(svgEl("line", { x1: x(0), x2: x(0), y1: top, y2: H - bottom, class: "axis" }));
+  svg.append(svgEl("text", { x: W - right, y: top + 12, "text-anchor": "end" }, "revenue growth →, capped at 200%"));
+  for (const p of pts) {
+    const dot = svgEl("circle", { cx: x(p.revenue_growth), cy: y(p.latest.roic), r: 6, fill: LAYER_COLOR[p.layer], stroke: "var(--surface)", "stroke-width": 2 });
+    dot.addEventListener("mousemove", e => showTip(tipCo(p) + `<div class="r"><span>Growth</span><span>${fmtP(p.revenue_growth)}</span></div>`, e.clientX, e.clientY)); dot.addEventListener("mouseleave", hideTip);
+    svg.append(dot); svg.append(svgEl("text", { x: x(p.revenue_growth) + 9, y: y(p.latest.roic) + 4 }, p.ticker));
+  }
+  el.append(svg);
+})();
+
+// line chart with crosshair tooltip
+function lines(id, series, { fmt, yMin }) {
+  const el = document.getElementById(id); el.innerHTML = "";
+  const W = 1100, H = 340, left = 56, right = 90, top = 12, bottom = 30;
+  const dates = [...new Set(series.flatMap(s => s.pts.map(p => p.end)))].sort();
+  if (!dates.length) return;
+  const t0 = new Date(dates[0]), t1 = new Date(dates[dates.length - 1]);
+  const vals = series.flatMap(s => s.pts.map(p => p.v));
+  const ymin = Math.min(yMin ?? 0, ...vals), ymax = Math.max(...vals) * 1.04;
+  const x = d => left + (new Date(d) - t0) / (t1 - t0 || 1) * (W - left - right), y = v => H - bottom - (v - ymin) / (ymax - ymin || 1) * (H - top - bottom);
+  const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": id });
+  for (const t of niceTicks(ymin, ymax, 5)) { svg.append(svgEl("line", { x1: left, x2: W - right, y1: y(t), y2: y(t), class: "gridl" })); svg.append(svgEl("text", { x: left - 8, y: y(t) + 4, "text-anchor": "end" }, fmt(t))); }
+  const years = [...new Set(dates.map(d => d.slice(0, 4)))];
+  for (const yr of years) { const d = yr + "-01-01"; if (new Date(d) >= t0) svg.append(svgEl("text", { x: x(d), y: H - 8, "text-anchor": "middle" }, yr)); }
+  svg.append(svgEl("line", { x1: left, x2: W - right, y1: y(0), y2: y(0), class: "axis" }));
+  const ends = [];
+  for (const s of series) {
+    const d = s.pts.map((p, i) => (i ? "L" : "M") + x(p.end).toFixed(1) + "," + y(p.v).toFixed(1)).join("");
+    svg.append(svgEl("path", { d, fill: "none", stroke: s.color, "stroke-width": 2, "stroke-linejoin": "round" }));
+    const last = s.pts[s.pts.length - 1]; ends.push({ s, x: x(last.end), y: y(last.v), text: s.label + " " + fmt(last.v) });
+  }
+  ends.sort((a, b) => a.y - b.y);
+  for (let i = 1; i < ends.length; i++) if (ends[i].y - ends[i - 1].y < 14) ends[i].y = ends[i - 1].y + 14;
+  for (const e of ends) { svg.append(svgEl("line", { x1: e.x, x2: e.x + 6, y1: e.y, y2: e.y, stroke: e.s.color, "stroke-width": 1 })); svg.append(svgEl("text", { x: e.x + 8, y: e.y + 4, class: "v" }, e.text)); }
+  const cross = svgEl("line", { x1: 0, x2: 0, y1: top, y2: H - bottom, class: "axis", style: "display:none" }); svg.append(cross);
+  const hit = svgEl("rect", { x: left, y: top, width: W - left - right, height: H - top - bottom, fill: "transparent" });
+  hit.addEventListener("mousemove", e => {
+    const r = svg.getBoundingClientRect(); const px = (e.clientX - r.left) / r.width * W; const tt = t0.getTime() + (px - left) / (W - left - right) * (t1 - t0);
+    const d = dates.reduce((a, b) => Math.abs(new Date(b) - tt) < Math.abs(new Date(a) - tt) ? b : a);
+    cross.setAttribute("x1", x(d)); cross.setAttribute("x2", x(d)); cross.style.display = "";
+    const rows = series.map(s => { const p = s.pts.find(p => p.end === d); return p ? `<div class="r"><span><i class="sw" style="background:${s.color}"></i>${s.label}</span><span>${fmt(p.v)}</span></div>` : ""; }).join("");
+    showTip(`<b>${d}</b>${rows}`, e.clientX, e.clientY);
+  });
+  hit.addEventListener("mouseleave", () => { cross.style.display = "none"; hideTip(); });
+  svg.append(hit); el.append(svg);
+}
+// stacked area
+function stacked(id, series, { fmt }) {
+  const el = document.getElementById(id); el.innerHTML = "";
+  const W = 540, H = 300, left = 52, right = 16, top = 12, bottom = 30;
+  const dates = [...new Set(series.flatMap(s => s.pts.map(p => p.end)))].sort();
+  if (!dates.length) return;
+  const at = (s, d) => { let v = 0; for (const p of s.pts) { if (p.end <= d) v = Math.max(0, p.v); else break; } return v; };
+  const totals = dates.map(d => series.reduce((a, s) => a + at(s, d), 0));
+  const t0 = new Date(dates[0]), t1 = new Date(dates[dates.length - 1]); const ymax = Math.max(...totals) * 1.05;
+  const x = d => left + (new Date(d) - t0) / (t1 - t0 || 1) * (W - left - right), y = v => H - bottom - v / (ymax || 1) * (H - top - bottom);
+  const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": id });
+  for (const t of niceTicks(0, ymax, 5)) { svg.append(svgEl("line", { x1: left, x2: W - right, y1: y(t), y2: y(t), class: "gridl" })); svg.append(svgEl("text", { x: left - 8, y: y(t) + 4, "text-anchor": "end" }, fmt(t))); }
+  for (const yr of [...new Set(dates.map(d => d.slice(0, 4)))]) { const d = yr + "-01-01"; if (new Date(d) >= t0) svg.append(svgEl("text", { x: x(d), y: H - 8, "text-anchor": "middle" }, yr)); }
+  let base = dates.map(() => 0);
+  for (const s of series) {
+    const tops = dates.map((d, i) => base[i] + at(s, d));
+    const d = dates.map((d, i) => (i ? "L" : "M") + x(d).toFixed(1) + "," + y(tops[i]).toFixed(1)).join("") + dates.map((d, i) => "L" + x(d).toFixed(1) + "," + y(base[i]).toFixed(1)).reverse().join("") + "Z";
+    svg.append(svgEl("path", { d, fill: s.color, stroke: "var(--surface)", "stroke-width": 2 }));   // 2px surface gap between fills
+    base = tops;
+  }
+  const cross = svgEl("line", { x1: 0, x2: 0, y1: top, y2: H - bottom, class: "axis", style: "display:none" }); svg.append(cross);
+  const hit = svgEl("rect", { x: left, y: top, width: W - left - right, height: H - top - bottom, fill: "transparent" });
+  hit.addEventListener("mousemove", e => {
+    const r = svg.getBoundingClientRect(); const px = (e.clientX - r.left) / r.width * W; const tt = t0.getTime() + (px - left) / (W - left - right) * (t1 - t0);
+    const d = dates.reduce((a, b) => Math.abs(new Date(b) - tt) < Math.abs(new Date(a) - tt) ? b : a); const i = dates.indexOf(d);
+    cross.setAttribute("x1", x(d)); cross.setAttribute("x2", x(d)); cross.style.display = "";
+    showTip(`<b>${d}</b><div class="r"><span>Total</span><span>${fmt(totals[i])}</span></div>` + [...series].reverse().map(s => `<div class="r"><span><i class="sw" style="background:${s.color}"></i>${s.label}</span><span>${fmt(at(s, d))}</span></div>`).join(""), e.clientX, e.clientY);
+  });
+  hit.addEventListener("mouseleave", () => { cross.style.display = "none"; hideTip(); });
+  svg.append(hit); el.append(svg);
+  return series;
+}
+// company series use one hue per layer, shaded by position so lines inside a layer stay apart while identity stays the layer's
+const shade = (c, i, n) => `color-mix(in oklab, ${c} ${100 - i * (45 / Math.max(1, n - 1))}%, var(--surface))`;
+let range = "5y";
+function trendCharts() {
+  const cutoff = range === "all" ? "0000" : new Date(Date.now() - (range === "2y" ? 2 : 5) * 365.25 * 86400e3).toISOString().slice(0, 10);
+  const hist = (c, key) => c.history.filter(h => h.end >= cutoff && h[key] != null).map(h => ({ end: h.end, v: h[key] }));
+  const trend = CO.filter(c => c.layer === "Hyperscalers" || c.layer === "AI silicon");
+  const groups = {}; trend.forEach(c => (groups[c.layer] = groups[c.layer] || []).push(c));
+  const ser = trend.map(c => ({ label: c.ticker, color: shade(LAYER_COLOR[c.layer], groups[c.layer].indexOf(c), groups[c.layer].length), pts: hist(c, "roic") })).filter(s => s.pts.length > 1);
+  lines("roiclines", ser, { fmt: v => fmtP(v, 0), yMin: 0 });
+  document.getElementById("legend2").innerHTML = ser.map(s => `<span style="--c:${s.color}">${s.label}</span>`).join("");
+  const stack = (id, layer, legendId) => { const cos = CO.filter(c => c.layer === layer); const ser = cos.map((c, i) => ({ label: c.ticker, color: shade(LAYER_COLOR[layer], i, cos.length), pts: hist(c, "capex_ttm").map(p => ({ end: p.end, v: p.v / 1e9 })) })).filter(s => s.pts.length > 1); stacked(id, ser, { fmt: v => "$" + Math.round(v) + "B" }); document.getElementById(legendId).innerHTML = ser.map(s => `<span style="--c:${s.color}">${s.label}</span>`).join(""); };
+  stack("capexstack", "Hyperscalers", "legend3"); stack("neostack", "Neoclouds", "legend4");
+}
+document.getElementById("range").innerHTML = ["2y", "5y", "all"].map(r => `<button aria-pressed="${r === range}" data-r="${r}">${r === "all" ? "All" : r.replace("y", " years")}</button>`).join("");
+document.getElementById("range").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; range = b.dataset.r; document.querySelectorAll("#range button").forEach(x => x.setAttribute("aria-pressed", x === b)); trendCharts(); });
+trendCharts();
+
+// table
+const cell = (v, f, cls) => `<td class="${v == null ? "na" : (v < 0 ? "neg " : "") + (cls || "")}">${f(v)}</td>`;
+document.getElementById("table").innerHTML = `<thead><tr><th>Company</th><th>Layer</th><th>As of</th><th>Revenue TTM</th><th>Growth</th><th>Op. margin</th><th>Capex TTM</th><th>Capex / revenue</th><th>Capex / D&amp;A</th><th>Invested capital</th><th>ROIC</th><th>Filing</th></tr></thead><tbody>` +
+  D.layers.flatMap(l => CO.filter(c => c.layer === l.layer).sort((a, b) => (b.latest.roic ?? -9) - (a.latest.roic ?? -9)).map(c => { const f = c.filings[0]; return `<tr><td><i class="sw" style="background:${LAYER_COLOR[c.layer]}"></i><a href="${c.edgar}" target="_blank" rel="noopener">${c.name}</a> <span class="na">${c.ticker}</span></td><td>${c.layer}</td><td>${c.asof}</td>${cell(c.latest.revenue_ttm, fmtB)}${cell(c.revenue_growth, fmtP)}${cell(c.op_margin, fmtP)}${cell(c.latest.capex_ttm, fmtB)}${cell(c.latest.capex_intensity, v => fmtP(v, 0))}${cell(c.capex_to_da, fmtX)}${cell(c.latest.invested, fmtB)}${cell(c.latest.roic, fmtP)}<td>${f ? `<a href="${f.url}" target="_blank" rel="noopener">${f.form} ${f.date}</a>` : ""}</td></tr>`; })).join("") + "</tbody>";
+
+document.getElementById("method").innerHTML = `<p><b>ROIC.</b> ${D.method.roic}</p><p><b>Quarters.</b> ${D.method.quarters}</p><p><b>Source.</b> ${D.method.source} Layer ROIC is capital-weighted: the layer's summed NOPAT over its summed invested capital, companies with undefined ROIC excluded. Nebius files annually (20-F), so its figures are the last fiscal year.</p><p><b>What this is not.</b> Segment returns (AWS, Azure, Google Cloud on their own) are not in EDGAR's summary API and are not shown; the hyperscaler figures are whole-company.</p>`;
+if (D.problems.length) document.getElementById("problems").textContent = "Skipped: " + D.problems.join("; ");
+</script>
+</body>
+</html>
