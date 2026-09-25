@@ -22,31 +22,37 @@ COMPANIES = [
     ("Neoclouds", [("CRWV", 1769628, "CoreWeave"), ("NBIS", 1513845, "Nebius"), ("APLD", 1144879, "Applied Digital"), ("IREN", 1878848, "IREN"),
                    ("CORZ", 1839341, "Core Scientific"), ("WULF", 1083301, "TeraWulf"), ("CIFR", 1819989, "Cipher"), ("HUT", 1964789, "Hut 8"), ("DOCN", 1582961, "DigitalOcean")]),
     ("Data-centre landlords", [("EQIX", 1101239, "Equinix"), ("DLR", 1297996, "Digital Realty")]),
-    ("AI silicon", [("NVDA", 1045810, "NVIDIA"), ("AVGO", 1730168, "Broadcom")]),
+    ("AI silicon", [("NVDA", 1045810, "NVIDIA"), ("AVGO", 1730168, "Broadcom"), ("AMD", 2488, "AMD"), ("MRVL", 1835632, "Marvell"), ("ARM", 1973239, "Arm")]),
+    ("Fabs & tools", [("TSM", 1046179, "TSMC"), ("INTC", 50863, "Intel"), ("ASML", 937966, "ASML"), ("AMAT", 6951, "Applied Materials"), ("LRCX", 707549, "Lam Research"), ("KLAC", 319201, "KLA")]),
+    ("Memory & storage", [("MU", 723125, "Micron"), ("SNDK", 2023554, "Sandisk"), ("WDC", 106040, "Western Digital"), ("STX", 1137789, "Seagate")]),
+    ("Networking & optics", [("ANET", 1596532, "Arista"), ("CSCO", 858877, "Cisco"), ("CIEN", 936395, "Ciena"), ("COHR", 820318, "Coherent"), ("LITE", 1633978, "Lumentum"), ("FN", 1408710, "Fabrinet"), ("CRDO", 1807794, "Credo"), ("ALAB", 1736297, "Astera Labs")]),
+    ("Systems & power", [("DELL", 1571996, "Dell"), ("SMCI", 1375365, "Supermicro"), ("HPE", 1645590, "HPE"), ("VRT", 1674101, "Vertiv"), ("ETN", 1551182, "Eaton"), ("GEV", 1996810, "GE Vernova"), ("NVT", 1720635, "nVent")]),
 ]
+# Foreign filers report in their own currency; ratios are currency-free, dollar totals use these fixed rates (stated on the page).
+FX = {"USD": 1.0, "TWD": 0.031, "EUR": 1.09, "GBP": 1.28, "JPY": 0.0067, "KRW": 0.00073}
 
 # Concept → ordered fallbacks. "flow" concepts are durations (income statement / cash flow); "stock" are instants (balance sheet).
 FLOW = {
-    "revenue": ["RevenueFromContractWithCustomerExcludingAssessedTax", "Revenues", "SalesRevenueNet", "RevenueFromContractWithCustomerIncludingAssessedTax"],
-    "opinc": ["OperatingIncomeLoss"],
-    "pretax": ["IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest", "IncomeLossFromContinuingOperationsBeforeIncomeTaxesMinorityInterestAndIncomeLossFromEquityMethodInvestments", "IncomeLossFromContinuingOperationsBeforeIncomeTaxesDomestic"],
-    "tax": ["IncomeTaxExpenseBenefit"],
+    "revenue": ["RevenueFromContractWithCustomerExcludingAssessedTax", "Revenues", "SalesRevenueNet", "RevenueFromContractWithCustomerIncludingAssessedTax", "Revenue"],
+    "opinc": ["OperatingIncomeLoss", "ProfitLossFromOperatingActivities"],
+    "pretax": ["IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest", "IncomeLossFromContinuingOperationsBeforeIncomeTaxesMinorityInterestAndIncomeLossFromEquityMethodInvestments", "IncomeLossFromContinuingOperationsBeforeIncomeTaxesDomestic", "ProfitLossBeforeTax"],
+    "tax": ["IncomeTaxExpenseBenefit", "IncomeTaxExpenseContinuingOperations"],
     "netinc": ["NetIncomeLoss", "ProfitLoss"],
-    "capex": ["PaymentsToAcquirePropertyPlantAndEquipment", "PaymentsToAcquireProductiveAssets", "PaymentsToAcquireOtherPropertyPlantAndEquipment", "PaymentsToAcquireMachineryAndEquipment", "PaymentsForCapitalImprovements", "PaymentsToDevelopRealEstateAssets", "PaymentsToAcquireRealEstate", "PaymentsToAcquireMiningAssets"],
-    "da": ["DepreciationDepletionAndAmortization", "DepreciationAndAmortization", "DepreciationAmortizationAndAccretionNet", "DepreciationAmortizationAndOther", "Depreciation", "DepreciationAndAmortizationExcludingAmortizationOfDeferredFinancingCosts"],
-    "cfo": ["NetCashProvidedByUsedInOperatingActivities"],
+    "capex": ["PaymentsToAcquirePropertyPlantAndEquipment", "PaymentsToAcquireProductiveAssets", "PaymentsToAcquireOtherPropertyPlantAndEquipment", "PaymentsToAcquireMachineryAndEquipment", "PaymentsForCapitalImprovements", "PaymentsToDevelopRealEstateAssets", "PaymentsToAcquireRealEstate", "PaymentsToAcquireMiningAssets", "PurchaseOfPropertyPlantAndEquipmentClassifiedAsInvestingActivities"],
+    "da": ["DepreciationDepletionAndAmortization", "DepreciationAndAmortization", "DepreciationAmortizationAndAccretionNet", "DepreciationAmortizationAndOther", "Depreciation", "DepreciationAndAmortizationExcludingAmortizationOfDeferredFinancingCosts", "DepreciationAndAmortisationExpense"],
+    "cfo": ["NetCashProvidedByUsedInOperatingActivities", "CashFlowsFromUsedInOperatingActivities"],
 }
 STOCK = {
     "assets": ["Assets"],
-    "curliab": ["LiabilitiesCurrent"],
-    "equity": ["StockholdersEquity", "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest"],
-    "ltd": ["LongTermDebtNoncurrent", "LongTermNotesAndLoans", "LongTermNotesPayable", "LongTermDebtAndCapitalLeaseObligations", "LongTermDebt", "LongTermDebtAndFinanceLeasesNoncurrent", "SeniorLongTermNotes", "SeniorNotes", "DebtInstrumentCarryingAmount", "SecuredDebt", "UnsecuredDebt", "NotesPayable"],
-    "ltd_cur": ["LongTermDebtCurrent", "LongTermDebtAndCapitalLeaseObligationsCurrent", "NotesPayableCurrent", "SeniorNotesCurrent", "DebtCurrent", "ShortTermBorrowings"],
-    "oplease": ["OperatingLeaseLiabilityNoncurrent", "OperatingLeaseLiability"],
+    "curliab": ["LiabilitiesCurrent", "CurrentLiabilities"],
+    "equity": ["StockholdersEquity", "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest", "EquityAttributableToOwnersOfParent", "Equity"],
+    "ltd": ["LongTermDebtNoncurrent", "LongTermNotesAndLoans", "LongTermNotesPayable", "LongTermDebtAndCapitalLeaseObligations", "LongTermDebt", "LongTermDebtAndFinanceLeasesNoncurrent", "SeniorLongTermNotes", "SeniorNotes", "DebtInstrumentCarryingAmount", "SecuredDebt", "UnsecuredDebt", "NotesPayable", "NoncurrentPortionOfNoncurrentBondsIssued", "LongtermBorrowings"],
+    "ltd_cur": ["LongTermDebtCurrent", "LongTermDebtAndCapitalLeaseObligationsCurrent", "NotesPayableCurrent", "SeniorNotesCurrent", "DebtCurrent", "ShortTermBorrowings", "CurrentPortionOfLongtermBorrowings", "ShorttermBorrowings"],
+    "oplease": ["OperatingLeaseLiabilityNoncurrent", "OperatingLeaseLiability", "NoncurrentLeaseLiabilities"],
     "finlease": ["FinanceLeaseLiabilityNoncurrent", "FinanceLeaseLiability"],
-    "cash": ["CashAndCashEquivalentsAtCarryingValue", "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents"],
+    "cash": ["CashAndCashEquivalentsAtCarryingValue", "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents", "CashAndCashEquivalents"],
     "sti": ["ShortTermInvestments", "MarketableSecuritiesCurrent", "AvailableForSaleSecuritiesDebtSecuritiesCurrent"],
-    "ppe": ["PropertyPlantAndEquipmentNet", "RealEstateInvestmentPropertyNet"],
+    "ppe": ["PropertyPlantAndEquipmentNet", "RealEstateInvestmentPropertyNet", "PropertyPlantAndEquipment"],
 }
 FORMS = {"10-K", "10-Q", "10-K/A", "10-Q/A", "10-KT", "20-F", "20-F/A"}
 
@@ -73,6 +79,7 @@ def fetch(url, cache_name=None):
 
 def days(a, b): return (dt.date.fromisoformat(b) - dt.date.fromisoformat(a)).days
 
+SEEN_UNITS = set()
 def series(facts, names, kind):
     """Union of every listed concept, keyed by period. Filers switch tags over the years, so the concept used most
     recently wins a period it shares with another; older periods come from whichever tag carried them."""
@@ -80,7 +87,10 @@ def series(facts, names, kind):
     for n in names:
         c = facts.get(n)
         if not c: continue
-        units = c["units"].get("USD") or next(iter(c["units"].values()))
+        unit = "USD" if "USD" in c["units"] else next((u for u in c["units"] if u in FX), None)
+        if not unit: continue
+        SEEN_UNITS.add(unit)
+        units = c["units"][unit]
         rows = [r for r in units if r.get("form") in FORMS and r.get("val") is not None]
         if not rows: continue
         rows.sort(key=lambda r: (r["end"], r.get("filed", "")))
@@ -88,9 +98,9 @@ def series(facts, names, kind):
         for r in rows:
             if kind == "flow":
                 if not r.get("start"): continue
-                out[(r["start"], r["end"])] = float(r["val"])
+                out[(r["start"], r["end"])] = float(r["val"]) * FX[unit]
             else:
-                out[r["end"]] = float(r["val"])
+                out[r["end"]] = float(r["val"]) * FX[unit]
         if out: per_tag.append((max(rows, key=lambda r: r["end"])["end"], n, out))
     if not per_tag: return None, {}
     per_tag.sort(key=lambda t: t[0], reverse=True)   # most recently used tag first
@@ -156,7 +166,8 @@ def nearest_stock(stock, target, tol=45):
 def company(ticker, cik, name, layer):
     cf = fetch(f"https://data.sec.gov/api/xbrl/companyfacts/CIK{cik:010d}.json", f"{cik}.json")
     sub = fetch(f"https://data.sec.gov/submissions/CIK{cik:010d}.json", f"sub-{cik}.json")
-    facts = cf["facts"].get("us-gaap", {})
+    facts = dict(cf["facts"].get("ifrs-full", {})); facts.update(cf["facts"].get("us-gaap", {}))
+    SEEN_UNITS.clear()
     used = {}
     flows, annuals = {}, {}
     for k, names in FLOW.items():
@@ -192,7 +203,9 @@ def company(ticker, cik, name, layer):
         ic_avg = (ic_now + ic_prev) / 2 if ic_now is not None and ic_prev is not None else ic_now
         rev = T("revenue", e); capex = T("capex", e); da = T("da", e); op = T("opinc", e)
         roic = n / ic_avg if n is not None and ic_avg and ic_avg > 0 else None
-        hist.append({"end": e, "revenue_ttm": rev, "opinc_ttm": op, "nopat_ttm": n, "invested": ic_now, "roic": roic,
+        debt = sum(nearest_stock(stocks[k], e) or 0 for k in ("ltd", "ltd_cur", "oplease", "finlease")); cash = (nearest_stock(stocks["cash"], e) or 0) + (nearest_stock(stocks["sti"], e) or 0)
+        hist.append({"end": e, "revenue_ttm": rev, "opinc_ttm": op, "nopat_ttm": n, "invested": ic_now, "roic": roic, "debt": debt, "cash": cash,
+                     "op_margin": op / rev if op is not None and rev else None,
                      "capex_ttm": capex, "da_ttm": da, "capex_intensity": capex / rev if capex and rev else None,
                      "revenue_q": flows["revenue"].get(e), "capex_q": flows["capex"].get(e)})
     hist = [h for h in hist if h["revenue_ttm"] is not None][-24:]
@@ -211,9 +224,40 @@ def company(ticker, cik, name, layer):
         "capex_growth": (latest["capex_ttm"] / prev_year["capex_ttm"] - 1) if latest and prev_year and prev_year["capex_ttm"] else None,
         "op_margin": (latest["opinc_ttm"] / latest["revenue_ttm"]) if latest and latest["opinc_ttm"] is not None and latest["revenue_ttm"] else None,
         "capex_to_da": (latest["capex_ttm"] / latest["da_ttm"]) if latest and latest["capex_ttm"] and latest["da_ttm"] else None,
-        "ppe": S("ppe"), "cfo_ttm": T("cfo"),
+        "ppe": S("ppe"), "cfo_ttm": T("cfo"), "currency": next(iter(SEEN_UNITS - {"USD"}), "USD"),
+        "op_margin_change": (latest["op_margin"] - prev_year["op_margin"]) if latest and prev_year and latest.get("op_margin") is not None and prev_year.get("op_margin") is not None else None,
+        "stale": days(asof, dt.date.today().isoformat()) > 135,
         "history": hist,
     }
+
+def write_insights(layers, rows):
+    """Plain sentences derived from the numbers, rewritten on every refresh. No model, no adjectives the data cannot back."""
+    def P(v, d=0):
+        return "n/a" if v is None else (f"{v*100:+.{d}f}%" if v < 0 else f"{v*100:.{d}f}%")
+    B = lambda v: "n/a" if v is None else (f"${v/1e12:.2f}T" if abs(v) >= 1e12 else f"${v/1e9:.0f}B")
+    L = {l["layer"]: l for l in layers}; out = []
+    ranked = sorted([l for l in layers if l["roic"] is not None], key=lambda l: -l["roic"])
+    out.append("Returns by layer, best to worst: " + "; ".join(f"{l['layer']} {P(l['roic'])}" for l in ranked) + ".")
+    h, n = L.get("Hyperscalers"), L.get("Neoclouds")
+    if h and h["capex_to_da"]: out.append(f"Hyperscalers spent {B(h['capex_ttm'])} on capex in the trailing year ({P(h['capex_growth'])} year on year) against {B(h['revenue_ttm'])} of revenue, and still earn {P(h['roic'])} on invested capital. Capex runs {h['capex_to_da']:.1f}× depreciation, so the depreciation bill is still catching up with the spend.")
+    if n and n["revenue_ttm"]: out.append(f"Neoclouds spent {B(n['capex_ttm'])}, {n['capex_ttm']/n['revenue_ttm']*100:.0f}% of their revenue, and earn {P(n['roic'])}: the layer is buying capacity ahead of returns.")
+    cos = [r for r in rows if r["latest"]]
+    SUP = ("AI silicon", "Fabs & tools", "Memory & storage", "Networking & optics", "Systems & power")
+    sup = [r for r in cos if r["layer"] in SUP]
+    top_growth = sorted([r for r in sup if r["revenue_growth"] is not None], key=lambda r: -r["revenue_growth"])[:5]
+    if top_growth: out.append("Fastest-growing suppliers by trailing revenue: " + ", ".join(f"{r['name']} {P(r['revenue_growth'])}" for r in top_growth) + ".")
+    margin_up = sorted([r for r in sup if r.get("op_margin_change") is not None], key=lambda r: -r["op_margin_change"])[:4]
+    margin_dn = sorted([r for r in sup if r.get("op_margin_change") is not None], key=lambda r: r["op_margin_change"])[:3]
+    if margin_up: out.append("Operating margin moved most. Up: " + ", ".join(f"{r['name']} {r['op_margin_change']*100:+.1f} pts to {P(r['op_margin'])}" for r in margin_up) + ". Down: " + ", ".join(f"{r['name']} {r['op_margin_change']*100:+.1f} pts to {P(r['op_margin'])}" for r in margin_dn) + ".")
+    supl = [l for l in layers if l["layer"] in SUP]
+    out.append("Where the supply chain earns it: " + "; ".join(f"{l['layer']} {P(l['roic'])} ROIC on {P(l['op_margin'])} margins, revenue {P(l['revenue_growth'])} y/y" for l in supl) + ".")
+    levered = sorted([r for r in cos if r["layer"] == "Neoclouds" and r["latest"]["revenue_ttm"]], key=lambda r: -(r["latest"]["debt"] or 0) / r["latest"]["revenue_ttm"])[:4]
+    if levered: out.append("Neocloud leverage, debt and leases over trailing revenue: " + ", ".join(f"{r['name']} {(r['latest']['debt'] or 0)/r['latest']['revenue_ttm']:.1f}×" for r in levered) + ".")
+    intense = sorted([r for r in cos if r["latest"]["capex_intensity"] is not None], key=lambda r: -r["latest"]["capex_intensity"])[:5]
+    out.append("Highest capex intensity: " + ", ".join(f"{r['name']} {r['latest']['capex_intensity']*100:.0f}% of revenue" for r in intense) + ".")
+    stale = [f"{r['name']} ({r['asof']})" for r in cos if r.get("stale")]
+    if stale: out.append("Figures more than a quarter old, usually annual-only foreign filers: " + ", ".join(stale) + ".")
+    return out
 
 def build():
     rows, problems = [], []
@@ -230,11 +274,20 @@ def build():
         members = [r for r in rows if r["layer"] == layer and r["latest"]]
         nopat = sum(r["latest"]["nopat_ttm"] or 0 for r in members if r["latest"]["roic"] is not None)
         ic = sum((r["latest"]["invested"] or 0) for r in members if r["latest"]["roic"] is not None)
+        def year_ago(r, key):
+            h = next((h for h in reversed(r["history"]) if 350 <= days(h["end"], r["asof"]) <= 380), None); return (h or {}).get(key)
+        cap_now = sum(r["latest"]["capex_ttm"] or 0 for r in members if year_ago(r, "capex_ttm")); cap_prev = sum(year_ago(r, "capex_ttm") or 0 for r in members if year_ago(r, "capex_ttm"))
+        rev_now = sum(r["latest"]["revenue_ttm"] or 0 for r in members if year_ago(r, "revenue_ttm")); rev_prev = sum(year_ago(r, "revenue_ttm") or 0 for r in members if year_ago(r, "revenue_ttm"))
+        op_now = sum(r["latest"]["opinc_ttm"] or 0 for r in members); da = sum(r["latest"]["da_ttm"] or 0 for r in members if r["latest"]["da_ttm"])
+        rev_all = sum(r["latest"]["revenue_ttm"] or 0 for r in members)
         layers.append({"layer": layer, "companies": [r["ticker"] for r in members],
-                       "revenue_ttm": sum(r["latest"]["revenue_ttm"] or 0 for r in members),
-                       "capex_ttm": sum(r["latest"]["capex_ttm"] or 0 for r in members),
+                       "revenue_ttm": rev_all, "capex_ttm": sum(r["latest"]["capex_ttm"] or 0 for r in members),
+                       "capex_growth": cap_now / cap_prev - 1 if cap_prev else None, "revenue_growth": rev_now / rev_prev - 1 if rev_prev else None,
+                       "op_margin": op_now / rev_all if rev_all else None,
+                       "capex_to_da": sum(r["latest"]["capex_ttm"] or 0 for r in members if r["latest"]["da_ttm"]) / da if da else None,
                        "nopat_ttm": nopat, "invested": ic, "roic": nopat / ic if ic > 0 else None})
-    data = {"generated": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"), "layers": layers, "companies": rows, "problems": problems,
+    insights = write_insights(layers, rows)
+    data = {"generated": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"), "layers": layers, "companies": rows, "problems": problems, "insights": insights, "fx": FX,
             "method": {"roic": "NOPAT ÷ average invested capital. NOPAT = trailing-four-quarter operating income × (1 − effective tax rate, clamped 0–35%, 21% when pre-tax income is not positive). Invested capital = shareholders' equity + long-term debt (current and non-current) + lease liabilities − cash − short-term investments, averaged between the latest quarter end and the one a year earlier.",
                        "quarters": "Filers tag single quarters for Q1–Q3 and only the full year for Q4; the fourth quarter is derived by subtraction. Trailing twelve months = the last four discrete quarters.",
                        "source": "SEC EDGAR XBRL company-facts API (data.sec.gov), US GAAP tags; every figure links back to the filing."}}

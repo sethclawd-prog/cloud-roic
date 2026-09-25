@@ -10,7 +10,7 @@
   color-scheme: light;
   --surface: #fcfcfb; --surface-2: #f1f1ee; --line: #e2e2dd; --grid: #ececE8;
   --text: #0b0b0b; --text-2: #52514e; --text-3: #8a8985;
-  --l1: #2a78d6; --l2: #eb6834; --l3: #1baf7a; --l4: #eda100;
+  --l1: #2a78d6; --l2: #eb6834; --l3: #1baf7a; --l4: #eda100; --l5: #e87ba4; --l6: #008300; --l7: #4a3aa7; --l8: #e34948;
   --neg: #e34948; --tooltip-bg: #ffffff;
 }
 @media (prefers-color-scheme: dark) {
@@ -18,7 +18,7 @@
     color-scheme: dark;
     --surface: #1a1a19; --surface-2: #232322; --line: #34342f; --grid: #2a2a27;
     --text: #ffffff; --text-2: #c3c2b7; --text-3: #8f8e86;
-    --l1: #3987e5; --l2: #d95926; --l3: #199e70; --l4: #c98500;
+    --l1: #3987e5; --l2: #d95926; --l3: #199e70; --l4: #c98500; --l5: #d55181; --l6: #008300; --l7: #9085e9; --l8: #e66767;
     --neg: #e66767; --tooltip-bg: #262624;
   }
 }
@@ -30,7 +30,7 @@ h1 { font-size: 30px; margin: 0 0 4px; letter-spacing: -0.02em; }
 h2 { font-size: 18px; margin: 42px 0 4px; }
 .sub { color: var(--text-2); margin: 0; }
 .meta { color: var(--text-3); font-size: 13px; margin-top: 8px; }
-.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; margin-top: 22px; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; margin-top: 22px; }
 .tile { background: var(--surface-2); border-radius: 12px; padding: 16px 18px 14px; border-top: 3px solid var(--c); }
 .tile .name { font-size: 13px; color: var(--text-2); display: flex; justify-content: space-between; }
 .tile .hero { font-size: 40px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.1; margin: 6px 0 4px; font-variant-numeric: tabular-nums; }
@@ -62,6 +62,7 @@ td .sw { display: inline-block; width: 8px; height: 8px; border-radius: 2px; mar
 td a { color: inherit; }
 .na { color: var(--text-3); }
 .neg { color: var(--neg); }
+.insights { padding-left: 20px; max-width: 900px; } .insights li { margin: 6px 0; }
 .method { font-size: 13.5px; color: var(--text-2); max-width: 820px; }
 .method p { margin: 8px 0; }
 .problems { font-size: 13px; color: var(--text-3); }
@@ -76,6 +77,10 @@ code { font-size: 12.5px; background: var(--surface-2); padding: 1px 5px; border
   <p class="meta" id="meta"></p>
 </header>
 <section class="kpis" id="kpis"></section>
+
+<h2>What the filings say</h2>
+<p class="sub">Written from the numbers on every refresh.</p>
+<ul class="insights" id="insights"></ul>
 
 <h2>ROIC by company</h2>
 <p class="sub">Trailing-twelve-month NOPAT over average invested capital. Companies whose invested capital is negative show no ratio.</p>
@@ -127,7 +132,7 @@ code { font-size: 12.5px; background: var(--surface-2); padding: 1px 5px; border
 <div class="tip" id="tip"></div>
 <script>
 const D = __DATA__;
-const LAYER_COLOR = { "Hyperscalers": "var(--l1)", "Neoclouds": "var(--l2)", "Data-centre landlords": "var(--l3)", "AI silicon": "var(--l4)" };
+const LAYER_COLOR = { "Hyperscalers": "var(--l1)", "Neoclouds": "var(--l2)", "Data-centre landlords": "var(--l3)", "AI silicon": "var(--l4)", "Fabs & tools": "var(--l5)", "Memory & storage": "var(--l6)", "Networking & optics": "var(--l7)", "Systems & power": "var(--l8)" };
 const fmtB = v => v == null ? "n/a" : (Math.abs(v) >= 1e12 ? "$" + (v / 1e12).toFixed(2) + "T" : "$" + (v / 1e9).toFixed(Math.abs(v) < 1e10 ? 1 : 0) + "B");
 const fmtP = (v, d = 1) => v == null ? "n/a" : (v * 100).toFixed(d) + "%";
 const fmtX = v => v == null ? "n/a" : v.toFixed(1) + "×";
@@ -140,6 +145,7 @@ const niceTicks = (min, max, n = 5) => { const span = max - min || 1; const raw 
 
 // header + KPIs
 document.getElementById("meta").textContent = "Generated " + new Date(D.generated).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) + " · latest quarter in the data " + CO.map(c => c.asof).sort().slice(-1)[0] + " · " + CO.length + " companies";
+document.getElementById("insights").innerHTML = (D.insights || []).map(t => `<li>${t}</li>`).join("");
 document.getElementById("kpis").innerHTML = D.layers.map(l => `<div class="tile" style="--c:${LAYER_COLOR[l.layer]}"><div class="name"><span>${l.layer}</span><span>${l.companies.length} cos</span></div><div class="hero">${fmtP(l.roic)}</div><div class="row"><span>revenue <b>${fmtB(l.revenue_ttm)}</b></span><span>capex <b>${fmtB(l.capex_ttm)}</b></span><span>invested <b>${fmtB(l.invested)}</b></span></div></div>`).join("");
 const legend = id => document.getElementById(id).innerHTML = D.layers.map(l => `<span style="--c:${LAYER_COLOR[l.layer]}">${l.layer}</span>`).join("");
 legend("legend1");
@@ -285,10 +291,10 @@ trendCharts();
 
 // table
 const cell = (v, f, cls) => `<td class="${v == null ? "na" : (v < 0 ? "neg " : "") + (cls || "")}">${f(v)}</td>`;
-document.getElementById("table").innerHTML = `<thead><tr><th>Company</th><th>Layer</th><th>As of</th><th>Revenue TTM</th><th>Growth</th><th>Op. margin</th><th>Capex TTM</th><th>Capex / revenue</th><th>Capex / D&amp;A</th><th>Invested capital</th><th>ROIC</th><th>Filing</th></tr></thead><tbody>` +
-  D.layers.flatMap(l => CO.filter(c => c.layer === l.layer).sort((a, b) => (b.latest.roic ?? -9) - (a.latest.roic ?? -9)).map(c => { const f = c.filings[0]; return `<tr><td><i class="sw" style="background:${LAYER_COLOR[c.layer]}"></i><a href="${c.edgar}" target="_blank" rel="noopener">${c.name}</a> <span class="na">${c.ticker}</span></td><td>${c.layer}</td><td>${c.asof}</td>${cell(c.latest.revenue_ttm, fmtB)}${cell(c.revenue_growth, fmtP)}${cell(c.op_margin, fmtP)}${cell(c.latest.capex_ttm, fmtB)}${cell(c.latest.capex_intensity, v => fmtP(v, 0))}${cell(c.capex_to_da, fmtX)}${cell(c.latest.invested, fmtB)}${cell(c.latest.roic, fmtP)}<td>${f ? `<a href="${f.url}" target="_blank" rel="noopener">${f.form} ${f.date}</a>` : ""}</td></tr>`; })).join("") + "</tbody>";
+document.getElementById("table").innerHTML = `<thead><tr><th>Company</th><th>Layer</th><th>As of</th><th>Revenue TTM</th><th>Growth</th><th>Op. margin</th><th>Capex TTM</th><th>Capex / revenue</th><th>Capex / D&amp;A</th><th>Margin Δ y/y</th><th>Debt + leases</th><th>Invested capital</th><th>ROIC</th><th>Filing</th></tr></thead><tbody>` +
+  D.layers.flatMap(l => CO.filter(c => c.layer === l.layer).sort((a, b) => (b.latest.roic ?? -9) - (a.latest.roic ?? -9)).map(c => { const f = c.filings[0]; return `<tr><td><i class="sw" style="background:${LAYER_COLOR[c.layer]}"></i><a href="${c.edgar}" target="_blank" rel="noopener">${c.name}</a> <span class="na">${c.ticker}</span></td><td>${c.layer}</td><td>${c.asof}${c.currency !== "USD" ? ` <span class="na">${c.currency}</span>` : ""}</td>${cell(c.latest.revenue_ttm, fmtB)}${cell(c.revenue_growth, fmtP)}${cell(c.op_margin, fmtP)}${cell(c.latest.capex_ttm, fmtB)}${cell(c.latest.capex_intensity, v => fmtP(v, 0))}${cell(c.capex_to_da, fmtX)}${cell(c.op_margin_change, v => v == null ? "n/a" : (v * 100).toFixed(1) + " pts")}${cell(c.latest.debt, fmtB)}${cell(c.latest.invested, fmtB)}${cell(c.latest.roic, fmtP)}<td>${f ? `<a href="${f.url}" target="_blank" rel="noopener">${f.form} ${f.date}</a>` : ""}</td></tr>`; })).join("") + "</tbody>";
 
-document.getElementById("method").innerHTML = `<p><b>ROIC.</b> ${D.method.roic}</p><p><b>Quarters.</b> ${D.method.quarters}</p><p><b>Source.</b> ${D.method.source} Layer ROIC is capital-weighted: the layer's summed NOPAT over its summed invested capital, companies with undefined ROIC excluded. Nebius files annually (20-F), so its figures are the last fiscal year.</p><p><b>What this is not.</b> Segment returns (AWS, Azure, Google Cloud on their own) are not in EDGAR's summary API and are not shown; the hyperscaler figures are whole-company.</p>`;
+document.getElementById("method").innerHTML = `<p><b>ROIC.</b> ${D.method.roic}</p><p><b>Quarters.</b> ${D.method.quarters}</p><p><b>Source.</b> ${D.method.source} Layer ROIC is capital-weighted: the layer's summed NOPAT over its summed invested capital, companies with undefined ROIC excluded. Annual-only filers (20-F: Nebius, TSMC, ASML, Arm) show their last fiscal year. Foreign-currency filers are converted at fixed rates for dollar totals only (TWD ${D.fx.TWD}, EUR ${D.fx.EUR}); every ratio is computed in the filer&rsquo;s own currency.</p><p><b>What this is not.</b> Segment returns (AWS, Azure, Google Cloud on their own) are not in EDGAR's summary API and are not shown; the hyperscaler figures are whole-company.</p>`;
 if (D.problems.length) document.getElementById("problems").textContent = "Skipped: " + D.problems.join("; ");
 </script>
 </body>
