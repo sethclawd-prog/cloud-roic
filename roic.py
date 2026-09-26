@@ -9,6 +9,7 @@ Only the standard library. EDGAR asks for a descriptive User-Agent with a contac
     EDGAR_CACHE=/tmp/edgar python3 roic.py   # reuse cached companyfacts JSON when present
 """
 import json, os, sys, time, urllib.request, datetime as dt
+import market
 from collections import defaultdict
 
 UA = os.environ.get("EDGAR_UA", "cloud-roic (github.com/sethclawd-prog/cloud-roic) research@example.com")
@@ -80,6 +81,7 @@ def fetch(url, cache_name=None):
 def days(a, b): return (dt.date.fromisoformat(b) - dt.date.fromisoformat(a)).days
 
 SEEN_UNITS = set()
+FACTS = {}
 def series(facts, names, kind):
     """Union of every listed concept, keyed by period. Filers switch tags over the years, so the concept used most
     recently wins a period it shares with another; older periods come from whichever tag carried them."""
@@ -145,7 +147,7 @@ def quarters(flow):
 def ttm(q, at=None, annual=None):
     ends = sorted(q)
     if at: ends = [e for e in ends if e <= at]
-    if len(ends) >= 4 and days(ends[-4], ends[-1]) <= 300: return sum(q[e] for e in ends[-4:])
+    if len(ends) >= 4 and days(ends[-4], ends[-1]) <= 300 and (not at or days(ends[-1], at) <= 100): return sum(q[e] for e in ends[-4:])
     if annual:   # annual-only filers (20-F): the last fiscal year ending at or before `at`
         fy = sorted((e, v) for (s0, e), v in annual.items() if not at or e <= at)
         if fy and (not at or days(fy[-1][0], at) <= 400): return fy[-1][1]
@@ -190,7 +192,8 @@ def company(ticker, cik, name, layer):
         cash = (nearest_stock(stocks["cash"], at) or 0) + (nearest_stock(stocks["sti"], at) or 0)
         return eq + debt - cash
     def nopat_at(at):
-        ebit = T("opinc", at); pt = T("pretax", at); tx = T("tax", at)
+        pt = T("pretax", at); tx = T("tax", at); ebit = T("opinc", at)
+        if ebit is None and pt is not None: ebit = pt; used["opinc_fallback"] = "pre-tax income"
         if ebit is None: return None, None
         rate = 0.21
         if pt and pt > 0 and tx is not None: rate = min(0.35, max(0.0, tx / pt))
@@ -202,6 +205,7 @@ def company(ticker, cik, name, layer):
         prev = (dt.date.fromisoformat(e) - dt.timedelta(days=365)).isoformat(); ic_prev = invested(prev)
         ic_avg = (ic_now + ic_prev) / 2 if ic_now is not None and ic_prev is not None else ic_now
         rev = T("revenue", e); capex = T("capex", e); da = T("da", e); op = T("opinc", e)
+        if op is None: op = T("pretax", e)
         roic = n / ic_avg if n is not None and ic_avg and ic_avg > 0 else None
         debt = sum(nearest_stock(stocks[k], e) or 0 for k in ("ltd", "ltd_cur", "oplease", "finlease")); cash = (nearest_stock(stocks["cash"], e) or 0) + (nearest_stock(stocks["sti"], e) or 0)
         hist.append({"end": e, "revenue_ttm": rev, "opinc_ttm": op, "nopat_ttm": n, "invested": ic_now, "roic": roic, "debt": debt, "cash": cash,
@@ -215,6 +219,7 @@ def company(ticker, cik, name, layer):
     filings = [{"form": rec["form"][i], "date": rec["filingDate"][i], "period": rec["reportDate"][i],
                 "url": f"https://www.sec.gov/Archives/edgar/data/{cik}/{rec['accessionNumber'][i].replace('-', '')}/{rec['primaryDocument'][i]}"}
                for i in range(len(rec["form"])) if rec["form"][i] in FORMS][:3]
+    FACTS[ticker] = cf
     return {
         "ticker": ticker, "cik": cik, "name": name, "layer": layer, "entity": cf.get("entityName"), "asof": asof,
         "fiscal_year_end": sub.get("fiscalYearEnd"), "edgar": f"https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK={cik:010d}&type=10&dateb=&owner=include&count=40",
@@ -225,6 +230,7 @@ def company(ticker, cik, name, layer):
         "op_margin": (latest["opinc_ttm"] / latest["revenue_ttm"]) if latest and latest["opinc_ttm"] is not None and latest["revenue_ttm"] else None,
         "capex_to_da": (latest["capex_ttm"] / latest["da_ttm"]) if latest and latest["capex_ttm"] and latest["da_ttm"] else None,
         "ppe": S("ppe"), "cfo_ttm": T("cfo"), "currency": next(iter(SEEN_UNITS - {"USD"}), "USD"),
+        "nopat_growth": (latest["nopat_ttm"] / prev_year["nopat_ttm"] - 1) if latest and prev_year and latest["nopat_ttm"] and prev_year["nopat_ttm"] and prev_year["nopat_ttm"] > 0 else None,
         "op_margin_change": (latest["op_margin"] - prev_year["op_margin"]) if latest and prev_year and latest.get("op_margin") is not None and prev_year.get("op_margin") is not None else None,
         "stale": days(asof, dt.date.today().isoformat()) > 135,
         "history": hist,
@@ -255,6 +261,18 @@ def write_insights(layers, rows):
     if levered: out.append("Neocloud leverage, debt and leases over trailing revenue: " + ", ".join(f"{r['name']} {(r['latest']['debt'] or 0)/r['latest']['revenue_ttm']:.1f}×" for r in levered) + ".")
     intense = sorted([r for r in cos if r["latest"]["capex_intensity"] is not None], key=lambda r: -r["latest"]["capex_intensity"])[:5]
     out.append("Highest capex intensity: " + ", ".join(f"{r['name']} {r['latest']['capex_intensity']*100:.0f}% of revenue" for r in intense) + ".")
+    priced = [r for r in cos if r.get("market", {}).get("ret_1y") is not None]
+    def solid(r):   # profit growth off a real base: last year's NOPAT was at least 5% of revenue
+        h = next((h for h in reversed(r["history"]) if 350 <= days(h["end"], r["asof"]) <= 380), None)
+        return h and h["nopat_ttm"] and h["revenue_ttm"] and h["nopat_ttm"] / h["revenue_ttm"] >= 0.05
+    lag = sorted([r for r in priced if r.get("nopat_growth") is not None and r["nopat_growth"] >= 0.15 and r["market"]["ret_1y"] < r["nopat_growth"] / 2 and solid(r)], key=lambda r: (1 + r["market"]["ret_1y"]) / (1 + r["nopat_growth"]))[:8]
+    if lag: out.append("Price has not followed profit: NOPAT up but the shares lag by more than half of it over a year: " + ", ".join(f"{r['name']} (NOPAT {P(r['nopat_growth'])}, shares {P(r['market']['ret_1y'])}, EV/NOPAT {r['ev_nopat']:.0f}×)" if r.get("ev_nopat") else f"{r['name']} (NOPAT {P(r['nopat_growth'])}, shares {P(r['market']['ret_1y'])})" for r in lag) + ".")
+    ahead = sorted([r for r in priced if r.get("ev_nopat") and r["market"]["ret_1y"] > 0.6 and (r.get("nopat_growth") is None or r["market"]["ret_1y"] > 2 * max(0, r["nopat_growth"]))], key=lambda r: -r["market"]["ret_1y"])[:8]
+    if ahead: out.append("Price well ahead of profit: shares up more than twice NOPAT growth: " + ", ".join(f"{r['name']} (shares {P(r['market']['ret_1y'])}, NOPAT {P(r['nopat_growth'])}, EV/NOPAT {r['ev_nopat']:.0f}×)" for r in ahead) + ".")
+    cheap = sorted([r for r in priced if r.get("ev_nopat") and r["latest"]["roic"] and r["latest"]["roic"] > 0.2 and r["ev_nopat"] < 20], key=lambda r: r["ev_nopat"])[:6]
+    if cheap: out.append("High return, low multiple: ROIC above 20% at under 20× EV/NOPAT: " + ", ".join(f"{r['name']} ({P(r['latest']['roic'])} ROIC, {r['ev_nopat']:.0f}×)" for r in cheap) + ".")
+    rich = sorted([r for r in priced if r.get("ev_nopat") and r["ev_nopat"] > 60], key=lambda r: -r["ev_nopat"])[:6]
+    if rich: out.append("Priced for a lot: EV above 60× NOPAT: " + ", ".join(f"{r['name']} ({r['ev_nopat']:.0f}×, NOPAT {P(r['nopat_growth'])} y/y)" for r in rich) + ".")
     stale = [f"{r['name']} ({r['asof']})" for r in cos if r.get("stale")]
     if stale: out.append("Figures more than a quarter old, usually annual-only foreign filers: " + ", ".join(stale) + ".")
     return out
@@ -269,6 +287,17 @@ def build():
                 else: problems.append(f"{ticker}: no revenue series")
             except Exception as e:
                 problems.append(f"{ticker}: {type(e).__name__}: {e}")
+    os.makedirs(OUT, exist_ok=True)
+    mk = market.market_for(rows, FACTS, os.path.join(OUT, "market.json"))
+    for r in rows:
+        m = mk.get(r["ticker"], {}); L = r["latest"]
+        r["market"] = m
+        if m.get("mcap") and L:
+            ev = m["mcap"] + (L["debt"] or 0) - (L["cash"] or 0)
+            r["ev"] = ev
+            r["ev_nopat"] = ev / L["nopat_ttm"] if L["nopat_ttm"] and L["nopat_ttm"] > 0 else None
+            r["ev_revenue"] = ev / L["revenue_ttm"] if L["revenue_ttm"] else None
+            r["price_gap"] = (m["ret_1y"] - r["nopat_growth"]) if r.get("nopat_growth") is not None and m.get("ret_1y") is not None else None
     layers = []
     for layer, _ in COMPANIES:
         members = [r for r in rows if r["layer"] == layer and r["latest"]]

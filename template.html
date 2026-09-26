@@ -100,6 +100,10 @@ code { font-size: 12.5px; background: var(--surface-2); padding: 1px 5px; border
   </div>
 </div>
 
+<h2>Price vs profit</h2>
+<p class="sub">One-year share price return against trailing NOPAT growth. Below the diagonal, the shares have not kept up with profits; above it, they have run ahead. Both axes capped at 300%.</p>
+<div class="chart" id="pricescatter"></div>
+
 <h2>ROIC over time</h2>
 <p class="sub">Hyperscalers and AI silicon, trailing twelve months at each quarter end.</p>
 <div class="filters" id="range"></div>
@@ -203,6 +207,31 @@ hbar("capexbars", byCapex.map(c => ({ label: c.name, v: c.latest.capex_intensity
   el.append(svg);
 })();
 
+// price vs NOPAT growth
+(function priceScatter() {
+  const el = document.getElementById("pricescatter"); const pts = CO.filter(c => c.nopat_growth != null && c.market && c.market.ret_1y != null);
+  if (!pts.length) { el.innerHTML = '<p class="na">No market data this run.</p>'; return; }
+  const W = 1100, H = 420, left = 60, right = 20, top = 16, bottom = 36, cap = 3;
+  const cx = v => Math.max(-1, Math.min(cap, v)), cy = v => Math.max(-1, Math.min(cap, v));
+  const xmin = Math.min(-0.5, ...pts.map(p => cx(p.nopat_growth))), xmax = Math.max(...pts.map(p => cx(p.nopat_growth))) + 0.1;
+  const ymin = Math.min(-0.5, ...pts.map(p => cy(p.market.ret_1y))), ymax = Math.max(...pts.map(p => cy(p.market.ret_1y))) + 0.1;
+  const x = v => left + (cx(v) - xmin) / (xmax - xmin) * (W - left - right), y = v => H - bottom - (cy(v) - ymin) / (ymax - ymin) * (H - top - bottom);
+  const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "price return versus NOPAT growth" });
+  for (const t of niceTicks(xmin, xmax, 7)) { svg.append(svgEl("line", { x1: x(t), x2: x(t), y1: top, y2: H - bottom, class: "gridl" })); svg.append(svgEl("text", { x: x(t), y: H - 12, "text-anchor": "middle" }, fmtP(t, 0))); }
+  for (const t of niceTicks(ymin, ymax, 6)) { svg.append(svgEl("line", { x1: left, x2: W - right, y1: y(t), y2: y(t), class: "gridl" })); svg.append(svgEl("text", { x: left - 8, y: y(t) + 4, "text-anchor": "end" }, fmtP(t, 0))); }
+  const lo = Math.max(xmin, ymin), hi = Math.min(xmax, ymax);
+  svg.append(svgEl("line", { x1: x(lo), y1: y(lo), x2: x(hi), y2: y(hi), class: "axis", "stroke-dasharray": "4 4" }));
+  svg.append(svgEl("line", { x1: left, x2: W - right, y1: y(0), y2: y(0), class: "axis" })); svg.append(svgEl("line", { x1: x(0), x2: x(0), y1: top, y2: H - bottom, class: "axis" }));
+  svg.append(svgEl("text", { x: W - right, y: top + 12, "text-anchor": "end" }, "NOPAT growth y/y →"));
+  svg.append(svgEl("text", { x: left + 6, y: top + 12 }, "↑ 1-year share price return"));
+  for (const p of pts) {
+    const dot = svgEl("circle", { cx: x(p.nopat_growth), cy: y(p.market.ret_1y), r: 6, fill: LAYER_COLOR[p.layer], stroke: "var(--surface)", "stroke-width": 2 });
+    dot.addEventListener("mousemove", e => showTip(tipCo(p) + `<div class="r"><span>NOPAT growth</span><span>${fmtP(p.nopat_growth)}</span></div><div class="r"><span>Share price 1y</span><span>${fmtP(p.market.ret_1y)}</span></div><div class="r"><span>EV / NOPAT</span><span>${fmtX(p.ev_nopat)}</span></div>`, e.clientX, e.clientY)); dot.addEventListener("mouseleave", hideTip);
+    svg.append(dot); svg.append(svgEl("text", { x: x(p.nopat_growth) + 9, y: y(p.market.ret_1y) + 4 }, p.ticker));
+  }
+  el.append(svg);
+})();
+
 // line chart with crosshair tooltip
 function lines(id, series, { fmt, yMin }) {
   const el = document.getElementById(id); el.innerHTML = "";
@@ -291,10 +320,10 @@ trendCharts();
 
 // table
 const cell = (v, f, cls) => `<td class="${v == null ? "na" : (v < 0 ? "neg " : "") + (cls || "")}">${f(v)}</td>`;
-document.getElementById("table").innerHTML = `<thead><tr><th>Company</th><th>Layer</th><th>As of</th><th>Revenue TTM</th><th>Growth</th><th>Op. margin</th><th>Capex TTM</th><th>Capex / revenue</th><th>Capex / D&amp;A</th><th>Margin Δ y/y</th><th>Debt + leases</th><th>Invested capital</th><th>ROIC</th><th>Filing</th></tr></thead><tbody>` +
-  D.layers.flatMap(l => CO.filter(c => c.layer === l.layer).sort((a, b) => (b.latest.roic ?? -9) - (a.latest.roic ?? -9)).map(c => { const f = c.filings[0]; return `<tr><td><i class="sw" style="background:${LAYER_COLOR[c.layer]}"></i><a href="${c.edgar}" target="_blank" rel="noopener">${c.name}</a> <span class="na">${c.ticker}</span></td><td>${c.layer}</td><td>${c.asof}${c.currency !== "USD" ? ` <span class="na">${c.currency}</span>` : ""}</td>${cell(c.latest.revenue_ttm, fmtB)}${cell(c.revenue_growth, fmtP)}${cell(c.op_margin, fmtP)}${cell(c.latest.capex_ttm, fmtB)}${cell(c.latest.capex_intensity, v => fmtP(v, 0))}${cell(c.capex_to_da, fmtX)}${cell(c.op_margin_change, v => v == null ? "n/a" : (v * 100).toFixed(1) + " pts")}${cell(c.latest.debt, fmtB)}${cell(c.latest.invested, fmtB)}${cell(c.latest.roic, fmtP)}<td>${f ? `<a href="${f.url}" target="_blank" rel="noopener">${f.form} ${f.date}</a>` : ""}</td></tr>`; })).join("") + "</tbody>";
+document.getElementById("table").innerHTML = `<thead><tr><th>Company</th><th>Layer</th><th>As of</th><th>Revenue TTM</th><th>Growth</th><th>Op. margin</th><th>Capex TTM</th><th>Capex / revenue</th><th>Capex / D&amp;A</th><th>Margin Δ y/y</th><th>Debt + leases</th><th>Invested capital</th><th>ROIC</th><th>Share price 1y</th><th>EV / NOPAT</th><th>Filing</th></tr></thead><tbody>` +
+  D.layers.flatMap(l => CO.filter(c => c.layer === l.layer).sort((a, b) => (b.latest.roic ?? -9) - (a.latest.roic ?? -9)).map(c => { const f = c.filings[0]; return `<tr><td><i class="sw" style="background:${LAYER_COLOR[c.layer]}"></i><a href="${c.edgar}" target="_blank" rel="noopener">${c.name}</a> <span class="na">${c.ticker}</span></td><td>${c.layer}</td><td>${c.asof}${c.currency !== "USD" ? ` <span class="na">${c.currency}</span>` : ""}</td>${cell(c.latest.revenue_ttm, fmtB)}${cell(c.revenue_growth, fmtP)}${cell(c.op_margin, fmtP)}${cell(c.latest.capex_ttm, fmtB)}${cell(c.latest.capex_intensity, v => fmtP(v, 0))}${cell(c.capex_to_da, fmtX)}${cell(c.op_margin_change, v => v == null ? "n/a" : (v * 100).toFixed(1) + " pts")}${cell(c.latest.debt, fmtB)}${cell(c.latest.invested, fmtB)}${cell(c.latest.roic, fmtP)}${cell(c.market && c.market.ret_1y, fmtP)}${cell(c.ev_nopat, v => v == null ? "n/a" : v.toFixed(0) + "×")}<td>${f ? `<a href="${f.url}" target="_blank" rel="noopener">${f.form} ${f.date}</a>` : ""}</td></tr>`; })).join("") + "</tbody>";
 
-document.getElementById("method").innerHTML = `<p><b>ROIC.</b> ${D.method.roic}</p><p><b>Quarters.</b> ${D.method.quarters}</p><p><b>Source.</b> ${D.method.source} Layer ROIC is capital-weighted: the layer's summed NOPAT over its summed invested capital, companies with undefined ROIC excluded. Annual-only filers (20-F: Nebius, TSMC, ASML, Arm) show their last fiscal year. Foreign-currency filers are converted at fixed rates for dollar totals only (TWD ${D.fx.TWD}, EUR ${D.fx.EUR}); every ratio is computed in the filer&rsquo;s own currency.</p><p><b>What this is not.</b> Segment returns (AWS, Azure, Google Cloud on their own) are not in EDGAR's summary API and are not shown; the hyperscaler figures are whole-company.</p>`;
+document.getElementById("method").innerHTML = `<p><b>ROIC.</b> ${D.method.roic}</p><p><b>Quarters.</b> ${D.method.quarters}</p><p><b>Source.</b> ${D.method.source} Layer ROIC is capital-weighted: the layer's summed NOPAT over its summed invested capital, companies with undefined ROIC excluded. Annual-only filers (20-F: Nebius, TSMC, ASML, Arm) show their last fiscal year. Foreign-currency filers are converted at fixed rates for dollar totals only (TWD ${D.fx.TWD}, EUR ${D.fx.EUR}); every ratio is computed in the filer&rsquo;s own currency.</p><p><b>Market.</b> Share prices from Yahoo Finance's public chart data, shares outstanding from each filing's cover page (share classes summed; TSMC ADS = 5 ordinary shares). Enterprise value = market cap + debt and leases − cash and short-term investments. None of this is investment advice; it is a screen of public numbers.</p><p><b>What this is not.</b> Segment returns (AWS, Azure, Google Cloud on their own) are not in EDGAR's summary API and are not shown; the hyperscaler figures are whole-company.</p>`;
 if (D.problems.length) document.getElementById("problems").textContent = "Skipped: " + D.problems.join("; ");
 </script>
 </body>
